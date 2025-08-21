@@ -1,6 +1,3 @@
-// =============================
-// File: frontend/script.js
-// =============================
 const el = (id) => document.getElementById(id);
 
 async function createLink() {
@@ -45,6 +42,12 @@ async function createLink() {
       correctLevel: QRCode.CorrectLevel.M,
     });
 
+    // --- Save link locally (device-specific) ---
+    let recent = JSON.parse(localStorage.getItem("recentLinks") || "[]");
+    recent.unshift({ shortUrl, url }); // add new link at the top
+    if (recent.length > 50) recent.pop(); // keep only last 50 links
+    localStorage.setItem("recentLinks", JSON.stringify(recent));
+
     await loadRecent();
   } catch (e) {
     el("msg").textContent = e.message;
@@ -53,28 +56,26 @@ async function createLink() {
 
 async function loadRecent() {
   try {
-    const res = await fetch("/api/links");
-    const data = await res.json();
-    if (!data.ok) return;
     const wrap = el("recent");
     wrap.innerHTML = "";
 
-    if (!data.rows.length) {
+    let data = JSON.parse(localStorage.getItem("recentLinks") || "[]");
+
+    if (!data.length) {
       wrap.innerHTML = '<div class="text-gray-500">No links yet.</div>';
       return;
     }
 
-    data.rows.forEach((r) => {
-      const shortUrl = `${window.location.protocol}//${window.location.host}/r/${r.id}`;
+    data.forEach((r) => {
       const s = `
         <div class="flex items-center justify-between gap-3 border border-gray-200 rounded-lg p-3">
           <div class="min-w-0">
-            <div class="font-medium truncate">${shortUrl}</div>
+            <div class="font-medium truncate">${r.shortUrl}</div>
             <div class="text-gray-500 truncate">${r.url}</div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <a class="text-sm underline" href="${shortUrl}" target="_blank">Open</a>
-            <button class="text-sm underline" data-copy="${shortUrl}">Copy</button>
+            <a class="text-sm underline" href="${r.shortUrl}" target="_blank">Open</a>
+            <button class="text-sm underline" data-copy="${r.shortUrl}">Copy</button>
           </div>
         </div>`;
       const div = document.createElement("div");
@@ -90,7 +91,6 @@ async function loadRecent() {
           await navigator.clipboard.writeText(text);
           btn.textContent = "Copied";
         } catch {
-          // fallback (execCommand for Safari/older browsers)
           const tmp = document.createElement("textarea");
           tmp.value = text;
           document.body.appendChild(tmp);
