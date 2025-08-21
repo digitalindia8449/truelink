@@ -196,9 +196,145 @@ app.get("/r/:id", (req, res) => {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Opening App…</title>
+  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* CSS same as before */
+    :root {
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --text: #111827;
+      --muted: #6b7280;
+      --glass-bg: rgba(255, 255, 255, 0.85);
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Roboto', system-ui, sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      background: linear-gradient(135deg, #f0f4f8, #e2e8f0, #f8fafc);
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+
+    .card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      border-radius: 1.6rem;
+      box-shadow: var(--shadow);
+      padding: 2rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      color: var(--text);
+      animation: fadeInUp 1s ease forwards;
+      border: 1px solid rgba(0,0,0,0.05);
+      box-sizing: border-box;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(25px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      margin: 0 0 0.75rem;
+      font-size: 2rem;
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      background: linear-gradient(90deg, #4f46e5, #4338ca, #6366f1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradientText 3s ease infinite;
+      word-break: break-word;
+    }
+
+    @keyframes gradientText {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    h2 .dot {
+      display: inline-block;
+      background: linear-gradient(90deg, #4f46e5, #4338ca, #6366f1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: bounceDots 1.5s infinite, gradientText 3s ease infinite;
+    }
+
+    h2 .dot:nth-child(2) { animation-delay: 0.2s, 0s; }
+    h2 .dot:nth-child(3) { animation-delay: 0.4s, 0s; }
+
+    @keyframes bounceDots {
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+
+    p {
+      margin: 0.5rem 0 1.6rem;
+      font-size: 1rem;
+      font-family: 'Roboto', sans-serif;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Sleek lightweight spinner */
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(79, 70, 229, 0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      margin: 1rem auto 1.6rem;
+      animation: spin 1.2s linear infinite;
+      box-shadow: 0 0 8px rgba(79,70,229,0.2);
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    a {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.85rem 1.8rem;
+      background: var(--accent);
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-radius: 0.9rem;
+      text-decoration: none;
+      transition: all 0.35s ease;
+      box-shadow: 0 10px 28px rgba(79,70,229,0.2);
+      word-break: break-word;
+    }
+
+    a:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 14px 36px rgba(79,70,229,0.25);
+    }
+
+    @media (max-width: 480px) {
+      h2 { font-size: 1.5rem; }
+      p { font-size: 0.9rem; }
+      .spinner { width: 40px; height: 40px; border-width: 3px; }
+      a { padding: 0.7rem 1.5rem; font-size: 0.9rem; }
+      .card { padding: 1.5rem; }
+    }
+
+    @media (max-width: 360px) {
+      h2 { font-size: 1.3rem; }
+      p { font-size: 0.85rem; }
+      .spinner { width: 35px; height: 35px; border-width: 3px; }
+      a { padding: 0.6rem 1.2rem; font-size: 0.85rem; }
+    }
   </style>
 </head>
 <body>
@@ -208,7 +344,7 @@ app.get("/r/:id", (req, res) => {
       Opening the app<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
     </h2>
     <p>If nothing happens, the link will open in your browser automatically.</p>
-    <a id="openChrome" href="${chromeScheme}" rel="noopener noreferrer">Open in Browser</a>
+    <a id="openChrome" href="${chromeScheme}" rel="noopener noreferrer">Open in Chrome</a>
   </div>
 
   <script>
@@ -240,8 +376,7 @@ app.get("/r/:id", (req, res) => {
     })();
   </script>
 </body>
-</html>
-`);
+</html>`);
 });
 
 app.listen(PORT, () => {
