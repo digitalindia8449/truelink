@@ -42,6 +42,18 @@ async function createLink() {
       correctLevel: QRCode.CorrectLevel.M,
     });
 
+    // --- API: delete short link ---
+    app.delete("/api/delete/:id", (req, res) => {
+      const { id } = req.params;
+      if (!id || !permanentLinks[id]) {
+        return res.status(404).json({ ok: false, error: "Link not found" });
+      }
+      delete permanentLinks[id];
+      delete linkStore[id];
+      return res.json({ ok: true, message: `Link ${id} deleted successfully.` });
+    });
+
+
     // --- Save link locally (device-specific) ---
     let recent = JSON.parse(localStorage.getItem("recentLinks") || "[]");
     recent.unshift({ shortUrl, url }); // add new link at the top
