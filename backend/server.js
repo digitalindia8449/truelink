@@ -219,18 +219,22 @@ function buildDeepLink(urlStr, userAgent) {
   if (m.bcc) gmailWeb.searchParams.set("bcc", m.bcc);
   const gmailWebStr = gmailWeb.toString();
 
-  // Android: force Gmail app via package + mailto: data
-  const mailtoQp = new URLSearchParams();
-  if (m.subject) mailtoQp.set("subject", m.subject);
-  if (m.body) mailtoQp.set("body", m.body);
-  if (m.cc) mailtoQp.set("cc", m.cc);
-  if (m.bcc) mailtoQp.set("bcc", m.bcc);
-  const mailtoCore = `mailto:${encodeURIComponent(m.to || "")}${mailtoQp.toString() ? "?" + mailtoQp.toString() : ""}`;
+ // Build query for both iOS and Android intent
+const q = new URLSearchParams();
+if (m.to) q.set("to", m.to);
+if (m.subject) q.set("subject", m.subject);
+if (m.body) q.set("body", m.body);
+if (m.cc) q.set("cc", m.cc);
+if (m.bcc) q.set("bcc", m.bcc);
 
-  androidIntent =
-    `intent://${mailtoCore.replace(/^mailto:/, "")}` +
-    `#Intent;scheme=mailto;package=com.google.android.gm;` +
-    `S.browser_fallback_url=${encodeURIComponent(gmailWebStr)};end`;
+// iOS stays the same (already above):
+// ios = `googlegmail:///co?${q.toString()}`;
+
+// ANDROID: use a path + query, not mailto://user@host
+androidIntent =
+  `intent://compose?${q.toString()}#Intent;scheme=mailto;package=com.google.android.gm;` +
+  `S.browser_fallback_url=${encodeURIComponent(gmailWebStr)};end`;
+
 
   // Fallbacks for the redirect HTML
   // If original was Gmail Web, keep it; if original was mailto, use Gmail Web as fallback
