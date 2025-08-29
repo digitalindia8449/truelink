@@ -263,6 +263,19 @@ app.post("/api/create", (req, res) => {
   return res.status(400).json({ ok: false, error: "Valid URL is required (http/https/mailto)." });
 }
 
+  // --- API: delete short link ---
+app.delete("/api/delete/:id", (req, res) => {
+  const { id } = req.params;
+  if (!id || !permanentLinks[id]) {
+    return res.status(404).json({ ok: false, error: "Link not found" });
+  }
+
+  delete permanentLinks[id];
+  delete linkStore[id];
+
+  return res.json({ ok: true, message: `Link ${id} deleted successfully.` });
+});
+
 
   let id = (slug || "").trim();
   if (id) {
