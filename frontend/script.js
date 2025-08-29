@@ -1,5 +1,15 @@
 const el = (id) => document.getElementById(id);
 
+// --- helper: extract short id from ".../r/:id"
+function extractIdFromShortUrl(shortUrl) {
+  try {
+    const u = new URL(shortUrl);
+    const parts = u.pathname.split("/").filter(Boolean); // ["r", ":id"]
+    if (parts[0] === "r" && parts[1]) return parts[1];
+  } catch {}
+  return "";
+}
+
 async function createLink() {
   const url = el("url").value.trim();
   const slug = el("slug").value.trim();
@@ -42,18 +52,6 @@ async function createLink() {
       correctLevel: QRCode.CorrectLevel.M,
     });
 
-    // --- API: delete short link ---
-    app.delete("/api/delete/:id", (req, res) => {
-      const { id } = req.params;
-      if (!id || !permanentLinks[id]) {
-        return res.status(404).json({ ok: false, error: "Link not found" });
-      }
-      delete permanentLinks[id];
-      delete linkStore[id];
-      return res.json({ ok: true, message: `Link ${id} deleted successfully.` });
-    });
-
-
     // --- Save link locally (device-specific) ---
     let recent = JSON.parse(localStorage.getItem("recentLinks") || "[]");
     recent.unshift({ shortUrl, url }); // add new link at the top
@@ -79,6 +77,7 @@ async function loadRecent() {
     }
 
     data.forEach((r) => {
+      const id = extractIdFromShortUrl(r.shortUrl);
       const s = `
         <div class="flex items-center justify-between gap-3 border border-gray-200 rounded-lg p-3">
           <div class="min-w-0">
@@ -88,6 +87,9 @@ async function loadRecent() {
           <div class="flex items-center gap-2 shrink-0">
             <a class="text-sm underline" href="${r.shortUrl}" target="_blank">Open</a>
             <button class="text-sm underline" data-copy="${r.shortUrl}">Copy</button>
+            <button class="text-sm text-red-600 underline" data-delete-id="${id}" data-delete-short="${r.shortUrl}">
+              Delete
+            </button>
           </div>
         </div>`;
       const div = document.createElement("div");
@@ -112,6 +114,40 @@ async function loadRecent() {
           btn.textContent = "Copied";
         }
         setTimeout(() => (btn.textContent = "Copy"), 1200);
+      });
+    });
+
+    // 🗑️ Delete handling
+    wrap.querySelectorAll("[data-delete-id]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-delete-id");
+        const shortUrl = btn.getAttribute("data-delete-short");
+        if (!id) return;
+
+        const ok = confirm(`Delete link "${id}"?`);
+        if (!ok) return;
+
+        try {
+          const res = await fetch(`/api/delete/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+          });
+          const data = await res.json();
+
+          if (!data.ok && data.error !== "Link not found") {
+            el("msg").textContent = data.error || "Delete failed.";
+            return;
+          }
+        } catch {
+          // If server fails (e.g., restarted), still remove from local list
+        }
+
+        // Remove from localStorage list by shortUrl
+        let recent = JSON.parse(localStorage.getItem("recentLinks") || "[]");
+        recent = recent.filter((x) => x.shortUrl !== shortUrl);
+        localStorage.setItem("recentLinks", JSON.stringify(recent));
+
+        // Refresh UI
+        await loadRecent();
       });
     });
   } catch (e) {
