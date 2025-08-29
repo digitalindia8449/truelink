@@ -24,14 +24,19 @@ app.get("/", (req, res) => {
 });
 
 // --- helpers ---
-function isValidHttpUrl(str) {
+function isValidUrl(str) {
   try {
     const u = new URL(str);
-    return u.protocol === "http:" || u.protocol === "https:";
+    return (
+      u.protocol === "http:" ||
+      u.protocol === "https:" ||
+      u.protocol === "mailto:"
+    );
   } catch (_) {
     return false;
   }
 }
+
 
 function generateId(n = 4) {
   return crypto.randomBytes(n).toString("base64url").slice(0, n + 2);
@@ -48,7 +53,23 @@ function getOrigin(req) {
 function detectApp(urlStr) {
   try {
     const u = new URL(urlStr);
-    const host = u.hostname.replace(/^www\./, "");
+
+    // Gmail via mailto:
+    if (u.protocol === "mailto:") {
+      return { app: "gmail", meta: { kind: "mailto", fields: parseMailto(urlStr) } };
+    }
+
+    const host = (u.hostname || "").replace(/^www\./, "");
+
+    // Gmail Web compose
+    if (
+      host === "mail.google.com" &&
+      u.pathname.startsWith("/mail/") &&
+      (u.searchParams.get("view") === "cm" || u.searchParams.get("compose") === "1" || u.searchParams.get("fs") === "1")
+    ) {
+      return { app: "gmail", meta: { kind: "web", fields: parseGmailWeb(u), u } };
+    }
+
     if (host.includes("youtube.com") || host === "youtu.be")
       return { app: "youtube", meta: { u } };
     if (host === "wa.me" || host.includes("whatsapp.com"))
@@ -68,6 +89,33 @@ function detectApp(urlStr) {
     return { app: null, meta: {} };
   }
 }
+
+function parseMailto(urlStr) {
+  const u = new URL(urlStr); // mailto:
+  const to = decodeURIComponent(u.pathname || "").trim();
+  const p = u.searchParams;
+  return {
+    to,
+    subject: p.get("subject") || p.get("su") || "",
+    body: p.get("body") || "",
+    cc: p.get("cc") || "",
+    bcc: p.get("bcc") || "",
+  };
+}
+
+// Accept Gmail Web compose links like:
+// https://mail.google.com/mail/?view=cm&fs=1&to=...&su=...&body=...&cc=...&bcc=...
+function parseGmailWeb(u) {
+  const p = u.searchParams;
+  return {
+    to: p.get("to") || "",
+    subject: p.get("su") || "",
+    body: p.get("body") || "",
+    cc: p.get("cc") || "",
+    bcc: p.get("bcc") || "",
+  };
+}
+
 
 function buildChromeScheme(fallbackHttps) {
   return `googlechrome://${fallbackHttps.replace(/^https?:\/\//, "")}`;
@@ -147,6 +195,54 @@ function buildDeepLink(urlStr, userAgent) {
       androidIntent = `intent://${hostPath}#Intent;scheme=https;package=com.facebook.katana;S.browser_fallback_url=${encFB};end`;
       break;
     }
+      case "gmail": {
+  // normalize fields from mailto: or Gmail Web
+  const m = (meta && meta.fields) || {};
+  const qp = new URLSearchParams();
+  if (m.to) qp.set("to", m.to);
+  if (m.subject) qp.set("subject", m.subject);
+  if (m.body) qp.set("body", m.body);
+  if (m.cc) qp.set("cc", m.cc);
+  if (m.bcc) qp.set("bcc", m.bcc);
+
+  // iOS: open Gmail app
+  ios = `googlegmail:///co?${qp.toString()}`;
+
+  // Gmail Web compose (fallback)
+  const gmailWeb = new URL("https://mail.google.com/mail/");
+  gmailWeb.searchParams.set("view", "cm");
+  gmailWeb.searchParams.set("fs", "1");
+  if (m.to) gmailWeb.searchParams.set("to", m.to);
+  if (m.subject) gmailWeb.searchParams.set("su", m.subject);
+  if (m.body) gmailWeb.searchParams.set("body", m.body);
+  if (m.cc) gmailWeb.searchParams.set("cc", m.cc);
+  if (m.bcc) gmailWeb.searchParams.set("bcc", m.bcc);
+  const gmailWebStr = gmailWeb.toString();
+
+  // Android: force Gmail app via package + mailto: data
+  const mailtoQp = new URLSearchParams();
+  if (m.subject) mailtoQp.set("subject", m.subject);
+  if (m.body) mailtoQp.set("body", m.body);
+  if (m.cc) mailtoQp.set("cc", m.cc);
+  if (m.bcc) mailtoQp.set("bcc", m.bcc);
+  const mailtoCore = `mailto:${encodeURIComponent(m.to || "")}${mailtoQp.toString() ? "?" + mailtoQp.toString() : ""}`;
+
+  androidIntent =
+    `intent://${mailtoCore.replace(/^mailto:/, "")}` +
+    `#Intent;scheme=mailto;package=com.google.android.gm;` +
+    `S.browser_fallback_url=${encodeURIComponent(gmailWebStr)};end`;
+
+  // Fallbacks for the redirect HTML
+  // If original was Gmail Web, keep it; if original was mailto, use Gmail Web as fallback
+  const fb = (meta && meta.kind === "web") ? (meta.u ? meta.u.toString() : gmailWebStr) : gmailWebStr;
+
+  return {
+    ios,
+    androidIntent,
+    fallbackHttps: fb,
+    chromeScheme: buildChromeScheme(fb),
+  };
+}
     default: {
       const hostPath = asHostPath(u);
       androidIntent = `intent://${hostPath}#Intent;scheme=${u.protocol.replace(":", "")};S.browser_fallback_url=${encFB};end`;
@@ -159,9 +255,10 @@ function buildDeepLink(urlStr, userAgent) {
 // --- API: create short link ---
 app.post("/api/create", (req, res) => {
   const { url, slug } = req.body || {};
-  if (!url || !isValidHttpUrl(url)) {
-    return res.status(400).json({ ok: false, error: "Valid URL is required (http/https)." });
-  }
+ if (!url || !isValidUrl(url)) {
+  return res.status(400).json({ ok: false, error: "Valid URL is required (http/https/mailto)." });
+}
+
 
   let id = (slug || "").trim();
   if (id) {
