@@ -495,6 +495,25 @@ app.get("/r/:id", (req, res) => {
 </html>`);
 });
 
+// --- Redirect handler ---
+app.get("/r/:id", (req, res) => {
+  const item = linkStore[req.params.id];
+  if (!item) return res.status(404).send("Link not found");
+
+  const { ios, androidIntent, fallback } = buildDeepLink(item.url, req.headers["user-agent"] || "");
+
+  res.setHeader("Cache-Control", "no-store");
+  res.send(`<!doctype html>
+  ... long HTML ...
+  `);
+});
+
+// --- Lightweight cron endpoint ---
+app.get("/cron/refresh", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.json({ ok: true, message: "refreshed" });
+});
+
 app.listen(PORT, () => {
   console.log(`✅ Server running at http://localhost:${PORT}`);
 });
